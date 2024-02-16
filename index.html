@@ -45,9 +45,10 @@
   </div>
   <div class="row mt-3">
     <div class="col-md-12">
-      <div id="progress" class="progress" style="display: none;">
-        <div id="progressBar" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
-      </div>
+        <div id="progress" class="progress" style="display: none;">
+            <div id="progressBar" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+          </div>
+          
     </div>
   </div>
   <div class="row mt-3">
@@ -70,14 +71,16 @@
  // Event listener for 'Check Domain' button
   // Separate event listener for 'Check Domain' button
   $('#checkButton').click(async function() {
-  const fullUrl = $('#domainInput').val().trim();
-  console.log("Full URL:", fullUrl); // Add this line to log the value of fullUrl
-  if (fullUrl) {
-    console.log("Is Valid:", isValidDomain(fullUrl)); // Log the result of isValidDomain
-    checkDomain(fullUrl); // Call the checkDomain function directly
-  } else {
-    showNotification("Invalid URL. Please enter a valid URL.", "danger"); // Handle empty input
-  }
+    const fullUrl = $('#domainInput').val().trim();
+    if (fullUrl) {
+        if (isValidDomain(fullUrl)) {
+            await checkDomainAndSetProgress(fullUrl); // Call checkDomainAndSetProgress directly
+        } else {
+            showNotification("Invalid URL. Please enter a valid URL.", "danger");
+        }
+    } else {
+        showNotification("Please enter a domain to check.", "danger");
+    }
 });
 
 
@@ -90,29 +93,43 @@ $(document).on('click', '.previousDomainButton', function() {
 });
  // Shared function to process domain
  async function processDomain(fullUrl) {
-    const domain = new URL(fullUrl).hostname;
+    let domain = fullUrl.trim(); // Remove any leading or trailing whitespace
+    // Check if the URL has a protocol, if not, prepend "https://"
+    if (!domain.match(/^https?:\/\//i)) {
+        domain = 'https://' + domain;
+    }
+
+    // Use the URL constructor to parse the full URL and extract the hostname
+    const urlObj = new URL(domain);
+    domain = urlObj.hostname; // This extracts the domain and TLD
+
     resetProgressAndResults(); // Reset UI
     saveDomainToLocalStorage(domain); // Save domain to local storage
     await checkDomainAndSetProgress(domain); // Check domain and potentially show progress
     $('#beginCrawlButton').show().text('Re-crawl Domain').data('domain', domain); // Show "Re-crawl Domain" button
-  }
+}
+
 
   async function checkDomainAndSetProgress(domain) {
     const response = await fetchData(`${endpointBase}/check-domain`, 'POST', { domain: domain });
+    $('#progress').show(); // Always show progress bar
     if (response.exists && response.data.urls.length > 0) {
-      const pendingUrls = response.data.urls.filter(url => url.status !== 'completed').length;
-      if (pendingUrls > 0) {
-        $('#progress').show(); // Show progress bar for pending URLs
-        refreshResults(domain); // Continuously refresh results as URLs are processed
-      } else {
-        $('#progress').hide(); // Hide progress bar if no pending URLs
-      }
-      $('#results').html(generateResultsHTML(response.data.urls)); // Display results
+        const pendingUrls = response.data.urls.filter(url => url.status !== 'completed').length;
+        if (pendingUrls > 0) {
+            refreshResults(domain); // Continuously refresh results as URLs are processed
+        }
+        $('#results').html(generateResultsHTML(response.data.urls)); // Display results
     } else {
-      $('#results').html("No previous results found.");
-      $('#beginCrawlButton').show().text('Begin Crawl').data('domain', domain); // Show "Begin Crawl" if no data
+        $('#results').html("No previous results found.");
+        $('#progress').hide();
     }
-  }
+    processDomain(domain); // Call processDomain to save the domain to local storage regardless of previous results
+}
+
+
+
+
+
 
 function showReCrawlButton(domain) {
   $('#beginCrawlButton').show().text('Re-crawl Domain').data('domain', domain);
@@ -183,13 +200,13 @@ function fetchQueueLength() {
   // Implement other functions (fetchData, checkDomain, initiateScan, etc.) here, ensuring they handle errors and update the UI accordingly
 
   // Function to save domain to local storage and update the UI
-  function saveDomainToLocalStorage(domain) {
+function saveDomainToLocalStorage(domain) {
     if (!previousDomains.includes(domain)) {
-      previousDomains.push(domain);
-      localStorage.setItem("searchedDomains", JSON.stringify(previousDomains));
-      displayPreviousDomains(); // Update the UI with the new domain list
+        previousDomains.push(domain);
+        localStorage.setItem("searchedDomains", JSON.stringify(previousDomains));
+        displayPreviousDomains(); // Update the UI with the new domain list
     }
-  }
+}
 
   // Function to retrieve domains from local storage
   function getDomainsFromLocalStorage() {
@@ -228,6 +245,7 @@ function displayPreviousDomains() {
     );
     return pattern.test(url);
 }
+
 
 
 
