@@ -141,6 +141,7 @@ function renderResults(data) {
             const li = document.createElement('li');
             if (info.error) {
                 li.textContent = `${variant} -> error: ${info.error}`;
+
             } else if (info.chain && Array.isArray(info.chain)) {
                 let text = variant;
                 for (let i = 0; i < info.chain.length; i++) {
@@ -153,6 +154,7 @@ function renderResults(data) {
                 li.textContent = text;
             } else {
                 li.textContent = `${variant} -> ${info.status}`;
+
             }
             vlist.appendChild(li);
         }

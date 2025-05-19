@@ -152,6 +152,7 @@ function directFetch(url) {
   });
 }
 
+
 function fetchRedirectChain(url, chain = [], maxRedirects = 5) {
   const lib = url.startsWith('https') ? https : http;
   return new Promise((resolve, reject) => {
@@ -166,10 +167,12 @@ function fetchRedirectChain(url, chain = [], maxRedirects = 5) {
         const nextUrl = new URL(res.headers.location, url).toString();
         res.resume();
         fetchRedirectChain(nextUrl, chain, maxRedirects - 1)
+
           .then(resolve)
           .catch(reject);
         return;
       }
+
       res.resume();
       resolve({ status: res.statusCode, finalUrl: url, chain });
     });
@@ -195,13 +198,16 @@ async function resolveVariants(domain) {
           final_url: info.finalUrl,
           chain: info.chain
         };
+
         if (!success && info.status < 400) {
           working.push(info.finalUrl);
           success = true;
         }
         if (info.status < 400) break;
       } catch (err) {
+
         results[url] = { error: err.error || err.message, chain: err.chain };
+
       }
     }
   }
