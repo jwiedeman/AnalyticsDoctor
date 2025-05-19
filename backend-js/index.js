@@ -83,6 +83,14 @@ function mergeAnalytics(target, pageData) {
   }
 }
 
+function serializeAnalytics(data) {
+  const out = {};
+  for (const [name, info] of Object.entries(data)) {
+    out[name] = { ids: Array.from(info.ids), method: info.method };
+  }
+  return out;
+}
+
 function directFetch(url) {
   const lib = url.startsWith('https') ? https : http;
   return new Promise((resolve, reject) => {
@@ -119,7 +127,7 @@ async function fetchPage(page, url) {
   }
 }
 
-async function crawlVariant(page, baseUrl, visited, scannedUrls, found, queue) {
+async function crawlVariant(page, baseUrl, visited, scannedUrls, found, pageResults, queue) {
   const baseHost = new URL(baseUrl).host;
   while (queue.length && scannedUrls.length < MAX_PAGES) {
     const url = queue.shift();
@@ -129,7 +137,9 @@ async function crawlVariant(page, baseUrl, visited, scannedUrls, found, queue) {
     const html = await fetchPage(page, url);
     if (!html) continue;
     scannedUrls.push(url);
-    mergeAnalytics(found, findAnalytics(html));
+    const pageData = findAnalytics(html);
+    mergeAnalytics(found, pageData);
+    pageResults[url] = serializeAnalytics(pageData);
     const $ = cheerio.load(html);
     $('a[href]').each((_, el) => {
       const link = new URL($(el).attr('href'), url).href;
@@ -145,9 +155,14 @@ async function scanVariants(variants) {
   const scanned = [];
   const working = [];
   const found = {};
+  const pageResults = {};
   const visited = new Set();
 
-  const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox'] });
+  const launchOpts = { headless: 'new', args: ['--no-sandbox'] };
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    launchOpts.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+  }
+  const browser = await puppeteer.launch(launchOpts);
   console.log('Browser launched');
   const page = await browser.newPage();
   await page.setUserAgent(USER_AGENT);
@@ -161,7 +176,9 @@ async function scanVariants(variants) {
       working.push(base);
       scanned.push(base);
       visited.add(base);
-      mergeAnalytics(found, findAnalytics(html));
+      const baseData = findAnalytics(html);
+      mergeAnalytics(found, baseData);
+      pageResults[base] = serializeAnalytics(baseData);
 
       const $ = cheerio.load(html);
       const queue = [];
@@ -172,7 +189,7 @@ async function scanVariants(variants) {
         }
       });
 
-      await crawlVariant(page, base, visited, scanned, found, queue);
+      await crawlVariant(page, base, visited, scanned, found, pageResults, queue);
     }
 
     const result = {};
@@ -180,7 +197,12 @@ async function scanVariants(variants) {
       result[name] = { ids: Array.from(data.ids), method: data.method };
     }
 
-    const summary = { working_variants: working, scanned_urls: scanned, found_analytics: result };
+    const summary = {
+      working_variants: working,
+      scanned_urls: scanned,
+      found_analytics: result,
+      page_results: pageResults
+    };
     console.log('Scan summary:', summary);
     return summary;
   } finally {

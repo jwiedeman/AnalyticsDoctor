@@ -4,7 +4,9 @@ document.getElementById('scan-form').addEventListener('submit', async (event) =>
     event.preventDefault();
     const domain = document.getElementById('domain').value;
     const resultEl = document.getElementById('result');
+    const pagesEl = document.getElementById('pages');
     resultEl.textContent = 'Scanning...';
+    pagesEl.innerHTML = '';
     try {
         const response = await fetch(`${API_BASE_URL}/scan`, {
             method: 'POST',
@@ -12,7 +14,18 @@ document.getElementById('scan-form').addEventListener('submit', async (event) =>
             body: JSON.stringify({ domain })
         });
         const data = await response.json();
-        resultEl.textContent = JSON.stringify(data, null, 2);
+        if (data.page_results) {
+            for (const [url, analytics] of Object.entries(data.page_results)) {
+                const pre = document.createElement('pre');
+                pre.textContent = `${url}\n${JSON.stringify(analytics, null, 2)}`;
+                pagesEl.appendChild(pre);
+            }
+        }
+        resultEl.textContent = JSON.stringify({
+            working_variants: data.working_variants,
+            scanned_urls: data.scanned_urls,
+            found_analytics: data.found_analytics
+        }, null, 2);
     } catch (err) {
         resultEl.textContent = 'Error: ' + err.toString();
     }

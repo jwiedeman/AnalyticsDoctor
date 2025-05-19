@@ -23,6 +23,17 @@ The backend uses **Express** with the `cors` middleware so requests from any ori
 
 The Node.js implementation relies on **Puppeteer** to load pages in a real headless browser while scanning up to 500 pages per site.
 
+## API Response
+
+The `/scan` endpoint returns JSON describing the analytics detected. The object
+has these fields:
+
+- `working_variants` – which domain variants responded successfully
+- `scanned_urls` – every page that was crawled
+- `found_analytics` – aggregated analytics IDs and detection methods
+- `page_results` – mapping of each scanned URL to the analytics found on that
+  page
+
 ## Running with Docker
 
 To ensure the backend uses a compatible Node.js version, you can build a Docker image.
@@ -33,7 +44,10 @@ docker run -p 5005:5005 analytics-doctor-backend
 
 ```
 
-The provided `Dockerfile` uses the official **Node 20** image so Puppeteer runs without socket issues on newer Node releases.
+The Dockerfile installs the system `chromium` package and sets
+`PUPPETEER_EXECUTABLE_PATH` so Puppeteer launches the correct browser.
+This avoids architecture issues (for example when building on Apple Silicon)
+and ensures scans run reliably.
 
 ## Exposing with ngrok
 
