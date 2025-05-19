@@ -5,7 +5,8 @@ This project provides a simple frontend and backend service for scanning a websi
 ## Structure
 
 - `frontend/` – A minimal static webpage that submits a domain to the backend and displays the JSON response.
-- `backend/` – A Flask application that crawls up to 500 pages of a site trying different domain variations and returns any analytics libraries detected in script tags.
+- `backend/` – The original Flask application for crawling a site.
+- `backend-js/` – A Node.js backend that uses Puppeteer to crawl pages with a real headless browser and detect analytics libraries.
 
 ## Running the Backend with Docker
 
@@ -17,13 +18,24 @@ docker build -t analytics-doctor .
 docker run -p 5000:5000 analytics-doctor
 ```
 
+### Running the Node.js Backend
+
+For a backend written in JavaScript using Puppeteer, use the `backend-js` folder:
+
+```
+cd backend-js
+npm install
+npm start
+```
+
 
 The backend uses **flask-cors** to allow requests from the static frontend. If
 you are serving the frontend from a different origin, the API will be
 accessible without additional configuration.
 
-The crawler now uses **aiohttp** to fetch pages asynchronously so multiple
-requests can be processed concurrently while scanning up to 500 pages per site.
+The Python crawler uses **aiohttp** to fetch pages asynchronously. The Node.js
+implementation relies on **Puppeteer** to load pages in a real headless browser
+while scanning up to 500 pages per site.
 
 ## Exposing with ngrok
 

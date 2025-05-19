@@ -1,0 +1,15 @@
+{
+  "name": "analytics-doctor-node",
+  "version": "1.0.0",
+  "description": "Node.js backend for Analytics Doctor",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "puppeteer": "^21.3.8",
+    "cheerio": "^1.0.0-rc.12"
+  }
+}
