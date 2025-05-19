@@ -25,12 +25,34 @@ const ANALYTICS_PATTERNS = {
     idRegex: [/analytics\s*\.load\(['"]([A-Za-z0-9]+)['"]\)/gi]
   },
   meta_pixel: {
-    src: ['connect.facebook.net'],
-    idRegex: [/fbq\(['"]init['"],\s*['"](\d+)['"]\)/gi]
+    src: ['connect.facebook.net', 'facebook.com/tr'],
+    idRegex: [
+      /fbq\(['"]init['"],\s*['"](\d+)['"]\)/gi,
+      /facebook\.com\/tr\?id=(\d+)/gi
+    ]
   },
   bing: {
     src: ['bat.bing.com'],
-    idRegex: []
+    idRegex: [/['"]?ti['"]?\s*:\s*['"](\d+)['"]/gi]
+  },
+  adobe_analytics: {
+    src: ['assets.adobedtm.com', 'omtrdc.net', '2o7.net'],
+    idRegex: [
+      /s_account\s*=\s*['"]([\w,]+)['"]/gi,
+      /s\.account\s*=\s*['"]([\w,]+)['"]/gi
+    ]
+  },
+  mixpanel: {
+    src: ['cdn.mxpnl.com', 'mixpanel.com'],
+    idRegex: [/mixpanel\.init\(['"]([A-Za-z0-9]+)['"]\)/gi]
+  },
+  hotjar: {
+    src: ['static.hotjar.com', 'script.hotjar.com'],
+    idRegex: [/_hjSettings\s*=\s*\{[^}]*hjid\s*:\s*(\d+)/gi]
+  },
+  amplitude: {
+    src: ['amplitude.com', 'cdn.amplitude.com'],
+    idRegex: [/amplitude\.init\(['"]([A-Za-z0-9-_]+)['"]\)/gi]
   }
 };
 
