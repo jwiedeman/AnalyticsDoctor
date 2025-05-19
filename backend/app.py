@@ -3,6 +3,7 @@ from flask_cors import CORS
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
+import re
 
 app = Flask(__name__)
 CORS(app, resources={r"/scan": {"origins": "*"}}, supports_credentials=True)
@@ -11,12 +12,30 @@ CORS(app, resources={r"/scan": {"origins": "*"}}, supports_credentials=True)
 
 MAX_PAGES = 500
 
+# Patterns for detecting popular analytics libraries.  Each entry contains
+# patterns to look for in script sources as well as regular expressions to
+# capture any analytics identifiers that appear in the HTML.
 ANALYTICS_PATTERNS = {
-    'google_analytics': ['googletagmanager.com/gtag/js', 'google-analytics.com/analytics.js'],
-    'google_tag_manager': ['googletagmanager.com/gtm.js'],
-    'segment': ['segment.com/analytics.js', 'cdn.segment.com'],
-    'meta_pixel': ['connect.facebook.net'],
-    'bing': ['bat.bing.com']
+    'google_analytics': {
+        'src': ['googletagmanager.com/gtag/js', 'google-analytics.com/analytics.js'],
+        'id_regex': [r'G-[A-Z0-9]+', r'UA-\d+-\d+']
+    },
+    'google_tag_manager': {
+        'src': ['googletagmanager.com/gtm.js'],
+        'id_regex': [r'GTM-[A-Z0-9]+']
+    },
+    'segment': {
+        'src': ['segment.com/analytics.js', 'cdn.segment.com'],
+        'id_regex': [r"analytics\s*\.load\(['\"]([A-Za-z0-9]+)['\"]\)"]
+    },
+    'meta_pixel': {
+        'src': ['connect.facebook.net'],
+        'id_regex': [r"fbq\(['\"]init['\"],\s*['\"](\d+)['\"]\)"]
+    },
+    'bing': {
+        'src': ['bat.bing.com'],
+        'id_regex': []
+    }
 }
 
 
@@ -38,15 +57,39 @@ def fetch_url(url: str):
 
 
 def find_analytics_in_html(html: str):
+    """Scan a single HTML document for analytics scripts and IDs."""
     soup = BeautifulSoup(html, 'html.parser')
-    results = set()
+    text = str(soup)
+
+    detected = {}
+
+    # First check script src attributes
     for script in soup.find_all('script', src=True):
         src = script['src']
         for name, patterns in ANALYTICS_PATTERNS.items():
-            for p in patterns:
+            for p in patterns['src']:
                 if p in src:
-                    results.add(name)
-    return list(results)
+                    detected.setdefault(name, {'ids': set(), 'method': None})
+
+    # Search for IDs within the HTML
+    for name, patterns in ANALYTICS_PATTERNS.items():
+        for regex in patterns['id_regex']:
+            for match in re.findall(regex, text, re.IGNORECASE):
+                detected.setdefault(name, {'ids': set(), 'method': None})
+                detected[name]['ids'].add(match)
+
+    # Determine GA4 method if GTM is present
+    if 'google_analytics' in detected:
+        if 'google_tag_manager' in detected:
+            detected['google_analytics']['method'] = 'via gtm'
+        else:
+            detected['google_analytics']['method'] = 'native'
+
+    # Convert id sets to lists
+    for data in detected.values():
+        data['ids'] = list(data['ids'])
+
+    return detected
 
 
 @app.route('/scan', methods=['POST'])
@@ -63,24 +106,33 @@ def scan_domain():
     ]
 
     scanned_urls = []
-    found_analytics = set()
+    working_variants = []
+    found_analytics = {}
+    visited = set()
 
     for base_url in variants:
         html = fetch_url(base_url)
         if not html:
             continue
-        found_analytics.update(find_analytics_in_html(html))
+        working_variants.append(base_url)
+        visited.add(base_url)
         scanned_urls.append(base_url)
+
+        page_results = find_analytics_in_html(html)
+        for name, data in page_results.items():
+            entry = found_analytics.setdefault(name, {'ids': set(), 'method': data.get('method')})
+            entry['ids'].update(data.get('ids', []))
+            if not entry.get('method') and data.get('method'):
+                entry['method'] = data['method']
+
         soup = BeautifulSoup(html, 'html.parser')
         links = [urljoin(base_url, a['href']) for a in soup.find_all('a', href=True)]
-        visited = set(scanned_urls)
         queue = []
         for link in links:
             if len(queue) + len(visited) >= MAX_PAGES:
                 break
             if urlparse(link).netloc == urlparse(base_url).netloc:
                 queue.append(link)
-
         while queue and len(scanned_urls) < MAX_PAGES:
             url = queue.pop(0)
             if url in visited:
@@ -90,7 +142,14 @@ def scan_domain():
                 continue
             visited.add(url)
             scanned_urls.append(url)
-            found_analytics.update(find_analytics_in_html(html))
+
+            page_results = find_analytics_in_html(html)
+            for name, data in page_results.items():
+                entry = found_analytics.setdefault(name, {'ids': set(), 'method': data.get('method')})
+                entry['ids'].update(data.get('ids', []))
+                if not entry.get('method') and data.get('method'):
+                    entry['method'] = data['method']
+
             soup = BeautifulSoup(html, 'html.parser')
             for a in soup.find_all('a', href=True):
                 link = urljoin(url, a['href'])
@@ -98,10 +157,17 @@ def scan_domain():
                     queue.append(link)
             if len(scanned_urls) >= MAX_PAGES:
                 break
-        if scanned_urls:
-            break  # stop after first working variant
+        # do not break here so we test all domain variants
 
-    return jsonify({'scanned_urls': scanned_urls, 'found_analytics': list(found_analytics)})
+    # convert id sets to lists for JSON serialisation
+    for data in found_analytics.values():
+        data['ids'] = list(data['ids'])
+
+    return jsonify({
+        'working_variants': working_variants,
+        'scanned_urls': scanned_urls,
+        'found_analytics': found_analytics
+    })
 
 
 if __name__ == '__main__':
