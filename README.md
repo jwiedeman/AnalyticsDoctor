@@ -5,20 +5,10 @@ This project provides a simple frontend and backend service for scanning a websi
 ## Structure
 
 - `frontend/` – A minimal static webpage that submits a domain to the backend and displays the JSON response.
-- `backend/` – The original Flask application for crawling a site.
 - `backend-js/` – A Node.js backend that uses Puppeteer to crawl pages with a real headless browser and detect analytics libraries.
 
-## Running the Backend with Docker
 
-```
-cd backend
-# Build the image
-docker build -t analytics-doctor .
-# Run the container
-docker run -p 5000:5000 analytics-doctor
-```
-
-### Running the Node.js Backend
+## Running the Node.js Backend
 
 For a backend written in JavaScript using Puppeteer, use the `backend-js` folder:
 
@@ -29,13 +19,9 @@ npm start
 ```
 
 
-The backend uses **flask-cors** to allow requests from the static frontend. If
-you are serving the frontend from a different origin, the API will be
-accessible without additional configuration.
+The backend uses **Express** with the `cors` middleware so requests from any origin are allowed by default.
 
-The Python crawler uses **aiohttp** to fetch pages asynchronously. The Node.js
-implementation relies on **Puppeteer** to load pages in a real headless browser
-while scanning up to 500 pages per site.
+The Node.js implementation relies on **Puppeteer** to load pages in a real headless browser while scanning up to 500 pages per site.
 
 ## Exposing with ngrok
 
@@ -51,8 +37,7 @@ Set the `API_BASE_URL` constant in `frontend/script.js` to the public URL of the
 
 When deploying the frontend (e.g. on Vercel), commit this change so the static
 site points to the correct backend URL. The backend allows requests from any
-origin by default thanks to `flask-cors`, so no additional CORS configuration is
-required.
+origin by default thanks to the `cors` middleware, so no additional configuration is required.
 
 ## Serving the Frontend
 
