@@ -17,9 +17,12 @@ docker build -t analytics-doctor .
 docker run -p 5000:5000 analytics-doctor
 ```
 
+
 The backend uses **flask-cors** to allow requests from the static frontend. If
 you are serving the frontend from a different origin, the API will be
 accessible without additional configuration.
+
+=======
 
 ## Exposing with ngrok
 
