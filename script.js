@@ -1,4 +1,3 @@
-// Change this to your backend's public URL when deploying, e.g. the ngrok URL
 const API_BASE_URL = 'https://3401-24-20-99-62.ngrok-free.app';
 
 document.getElementById('scan-form').addEventListener('submit', async (event) => {
