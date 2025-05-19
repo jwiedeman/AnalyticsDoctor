@@ -152,10 +152,12 @@ function directFetch(url) {
   });
 }
 
-function fetchWithStatus(url, maxRedirects = 3) {
+
+function fetchRedirectChain(url, chain = [], maxRedirects = 5) {
   const lib = url.startsWith('https') ? https : http;
   return new Promise((resolve, reject) => {
     const req = lib.get(url, res => {
+      chain.push({ url, status: res.statusCode });
       if (
         res.statusCode >= 300 &&
         res.statusCode < 400 &&
@@ -164,20 +166,20 @@ function fetchWithStatus(url, maxRedirects = 3) {
       ) {
         const nextUrl = new URL(res.headers.location, url).toString();
         res.resume();
-        fetchWithStatus(nextUrl, maxRedirects - 1)
+        fetchRedirectChain(nextUrl, chain, maxRedirects - 1)
+
           .then(resolve)
           .catch(reject);
         return;
       }
-      let data = '';
-      res.on('data', chunk => {
-        data += chunk;
-      });
-      res.on('end', () => {
-        resolve({ status: res.statusCode, finalUrl: url, body: data });
-      });
+
+      res.resume();
+      resolve({ status: res.statusCode, finalUrl: url, chain });
     });
-    req.on('error', reject);
+    req.on('error', err => {
+      chain.push({ url, error: err.message });
+      reject({ error: err.message, chain });
+    });
   });
 }
 
@@ -190,15 +192,22 @@ async function resolveVariants(domain) {
     for (const scheme of ['https', 'http']) {
       const url = `${scheme}://${host}`;
       try {
-        const info = await fetchWithStatus(url);
-        results[url] = { status: info.status, final_url: info.finalUrl };
+        const info = await fetchRedirectChain(url);
+        results[url] = {
+          status: info.status,
+          final_url: info.finalUrl,
+          chain: info.chain
+        };
+
         if (!success && info.status < 400) {
           working.push(info.finalUrl);
           success = true;
         }
         if (info.status < 400) break;
       } catch (err) {
-        results[url] = { error: err.message };
+
+        results[url] = { error: err.error || err.message, chain: err.chain };
+
       }
     }
   }

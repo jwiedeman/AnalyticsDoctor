@@ -141,11 +141,20 @@ function renderResults(data) {
             const li = document.createElement('li');
             if (info.error) {
                 li.textContent = `${variant} -> error: ${info.error}`;
+
+            } else if (info.chain && Array.isArray(info.chain)) {
+                let text = variant;
+                for (let i = 0; i < info.chain.length; i++) {
+                    const step = info.chain[i];
+                    text += ` -> ${step.status}`;
+                    if (i < info.chain.length - 1) {
+                        text += ` to ${info.chain[i + 1].url}`;
+                    }
+                }
+                li.textContent = text;
             } else {
-                const note = info.final_url && info.final_url !== variant
-                    ? ` -> ${info.status} to ${info.final_url}`
-                    : ` -> ${info.status}`;
-                li.textContent = `${variant}${note}`;
+                li.textContent = `${variant} -> ${info.status}`;
+
             }
             vlist.appendChild(li);
         }
