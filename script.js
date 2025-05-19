@@ -112,7 +112,10 @@ function renderResults(data) {
                 const entry = analytics[key];
                 if (entry) {
                     const ids = (entry.ids || []).join(', ') || 'unknown id';
-                    td.innerHTML = `<div>${entry.method || 'native'}</div><div>${ids}</div>`;
+                    td.className = 'analytics-cell';
+                    td.innerHTML =
+                        `<div class="method">${entry.method || 'native'}</div>` +
+                        `<div class="ids">${ids}</div>`;
                 } else {
                     td.textContent = '';
                 }
