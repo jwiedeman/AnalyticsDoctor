@@ -5,6 +5,8 @@ const cheerio = require('cheerio');
 const http = require('http');
 const https = require('https');
 const { URL } = require('url');
+const http = require('http');
+const https = require('https');
 
 const MAX_PAGES = 500;
 const USER_AGENT =
@@ -83,6 +85,21 @@ function mergeAnalytics(target, pageData) {
   }
 }
 
+
+function directFetch(url) {
+  const lib = url.startsWith('https') ? https : http;
+  return new Promise(resolve => {
+    console.log(`Directly fetching ${url}`);
+    const req = lib.get(url, { headers: { 'User-Agent': USER_AGENT } }, res => {
+      let data = '';
+      res.setEncoding('utf8');
+      res.on('data', chunk => (data += chunk));
+      res.on('end', () => resolve(data));
+    });
+    req.on('error', err => {
+      console.error(`Direct fetch failed for ${url}:`, err);
+      resolve(null);
+
 function fetchWithRequest(url) {
   return new Promise((resolve, reject) => {
     const lib = url.startsWith('https') ? https : http;
@@ -92,6 +109,7 @@ function fetchWithRequest(url) {
       res.on('end', () => resolve(data));
     }).on('error', err => {
       reject(err);
+
     });
   });
 }
@@ -102,6 +120,10 @@ async function fetchPage(page, url) {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 10000 });
     return await page.content();
   } catch (err) {
+
+    console.error(`Failed to fetch ${url} with puppeteer:`, err);
+    return await directFetch(url);
+
     console.error(`Failed to fetch with browser ${url}:`, err);
     try {
       console.log(`Falling back to direct request for ${url}`);
@@ -112,6 +134,7 @@ async function fetchPage(page, url) {
     }
     console.error(`Failed to fetch ${url}:`, err);
     return null;
+
   }
 }
 
@@ -184,6 +207,27 @@ async function scanVariants(variants) {
     const page = await browser.newPage();
     await page.setUserAgent(USER_AGENT);
 
+
+  try {
+    for (const base of variants) {
+      if (scanned.length >= MAX_PAGES) break;
+      console.log('Scanning base URL:', base);
+      const html = await fetchPage(page, base);
+      if (!html) continue;
+      working.push(base);
+      scanned.push(base);
+      visited.add(base);
+      mergeAnalytics(found, findAnalytics(html));
+
+      const $ = cheerio.load(html);
+      const queue = [];
+      $('a[href]').each((_, el) => {
+        const link = new URL($(el).attr('href'), base).href;
+        if (new URL(link).host === new URL(base).host && !visited.has(link)) {
+          queue.push(link);
+        }
+      });
+
   for (const base of variants) {
     if (scanned.length >= MAX_PAGES) break;
     console.log('Scanning base URL:', base);
@@ -203,8 +247,23 @@ async function scanVariants(variants) {
       }
     });
 
-    await crawlVariant(page, base, visited, scanned, found, queue);
+
+      await crawlVariant(page, base, visited, scanned, found, queue);
+    }
+  } finally {
+    await browser.close();
+    console.log('Browser closed');
   }
+
+
+  const result = {};
+  for (const [name, data] of Object.entries(found)) {
+    result[name] = { ids: Array.from(data.ids), method: data.method };
+  }
+
+  const summary = { working_variants: working, scanned_urls: scanned, found_analytics: result };
+  console.log('Scan summary:', summary);
+  return summary;
 
   } finally {
     if (browser) {
@@ -226,6 +285,7 @@ async function scanVariants(variants) {
   const summary = { working_variants: working, scanned_urls: scanned, found_analytics: result };
   console.log('Scan summary:', summary);
   return summary;
+
 
 }
 
