@@ -70,6 +70,28 @@ button:hover {
     font-weight: bold;
 }
 
+#progress-container {
+    width: 100%;
+    height: 8px;
+    background: #eee;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 0.25rem;
+}
+
+#progress-bar {
+    height: 100%;
+    width: 0%;
+    background: var(--nasa-red);
+    transition: width 0.2s ease;
+}
+
+#eta {
+    margin-bottom: 1rem;
+    font-size: 0.9em;
+    color: #333;
+}
+
 #pages-table {
     width: 100%;
     border-collapse: collapse;
