@@ -2,6 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const puppeteer = require('puppeteer');
 const cheerio = require('cheerio');
+const http = require('http');
+const https = require('https');
 const { URL } = require('url');
 
 const MAX_PAGES = 500;
@@ -81,12 +83,33 @@ function mergeAnalytics(target, pageData) {
   }
 }
 
+function fetchWithRequest(url) {
+  return new Promise((resolve, reject) => {
+    const lib = url.startsWith('https') ? https : http;
+    lib.get(url, res => {
+      let data = '';
+      res.on('data', chunk => (data += chunk));
+      res.on('end', () => resolve(data));
+    }).on('error', err => {
+      reject(err);
+    });
+  });
+}
+
 async function fetchPage(page, url) {
   try {
+    console.log(`Fetching ${url}`);
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 10000 });
     return await page.content();
-  } catch {
-    return null;
+  } catch (err) {
+    console.error(`Failed to fetch with browser ${url}:`, err);
+    try {
+      console.log(`Falling back to direct request for ${url}`);
+      return await fetchWithRequest(url);
+    } catch (reqErr) {
+      console.error(`Fallback request failed for ${url}:`, reqErr);
+      return null;
+    }
   }
 }
 
@@ -94,6 +117,7 @@ async function crawlVariant(page, baseUrl, visited, scannedUrls, found, queue) {
   const baseHost = new URL(baseUrl).host;
   while (queue.length && scannedUrls.length < MAX_PAGES) {
     const url = queue.shift();
+    console.log('Crawling:', url);
     if (visited.has(url)) continue;
     visited.add(url);
     const html = await fetchPage(page, url);
@@ -111,6 +135,7 @@ async function crawlVariant(page, baseUrl, visited, scannedUrls, found, queue) {
 }
 
 async function scanVariants(variants) {
+  console.log('Starting scan of variants:', variants);
   const scanned = [];
   const working = [];
   const found = {};
@@ -119,41 +144,50 @@ async function scanVariants(variants) {
   const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox'] });
   const page = await browser.newPage();
   await page.setUserAgent(USER_AGENT);
+  try {
+    for (const base of variants) {
+      if (scanned.length >= MAX_PAGES) break;
+      console.log('Scanning base URL:', base);
+      const html = await fetchPage(page, base);
+      if (!html) continue;
+      working.push(base);
+      scanned.push(base);
+      visited.add(base);
+      mergeAnalytics(found, findAnalytics(html));
 
-  for (const base of variants) {
-    if (scanned.length >= MAX_PAGES) break;
-    const html = await fetchPage(page, base);
-    if (!html) continue;
-    working.push(base);
-    scanned.push(base);
-    visited.add(base);
-    mergeAnalytics(found, findAnalytics(html));
+      const $ = cheerio.load(html);
+      const queue = [];
+      $('a[href]').each((_, el) => {
+        const link = new URL($(el).attr('href'), base).href;
+        if (new URL(link).host === new URL(base).host && !visited.has(link)) {
+          queue.push(link);
+        }
+      });
 
-    const $ = cheerio.load(html);
-    const queue = [];
-    $('a[href]').each((_, el) => {
-      const link = new URL($(el).attr('href'), base).href;
-      if (new URL(link).host === new URL(base).host && !visited.has(link)) {
-        queue.push(link);
-      }
-    });
+      await crawlVariant(page, base, visited, scanned, found, queue);
+    }
 
-    await crawlVariant(page, base, visited, scanned, found, queue);
+    const result = {};
+    for (const [name, data] of Object.entries(found)) {
+      result[name] = { ids: Array.from(data.ids), method: data.method };
+    }
+
+    const summary = { working_variants: working, scanned_urls: scanned, found_analytics: result };
+    console.log('Scan summary:', summary);
+    return summary;
+  } finally {
+    await browser.close();
+    console.log('Browser closed');
   }
-
-  await browser.close();
-
-  const result = {};
-  for (const [name, data] of Object.entries(found)) {
-    result[name] = { ids: Array.from(data.ids), method: data.method };
-  }
-
-  return { working_variants: working, scanned_urls: scanned, found_analytics: result };
 }
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use((req, res, next) => {
+  console.log(`Incoming ${req.method} ${req.url}`, req.body);
+  next();
+});
 
 app.post('/scan', async (req, res) => {
   const domain = cleanDomain(req.body.domain || '');
@@ -163,10 +197,12 @@ app.post('/scan', async (req, res) => {
     `http://www.${domain}`,
     `https://www.${domain}`
   ].filter(Boolean)));
+  console.log('Scanning variants:', variants);
   try {
     const result = await scanVariants(variants);
     res.json(result);
   } catch (err) {
+    console.error('Scan failed:', err);
     res.status(500).json({ error: err.toString() });
   }
 });
