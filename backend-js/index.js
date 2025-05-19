@@ -148,7 +148,7 @@ async function fetchPage(page, url) {
 }
 
 
-async function crawlVariant(page, baseUrl, visited, scannedUrls, found, pageResults, queue, maxPages) {
+async function crawlVariant(page, baseUrl, visited, scannedUrls, found, pageResults, queue, maxPages, progress) {
 
   const baseHost = new URL(baseUrl).host;
   while (queue.length && scannedUrls.length < maxPages) {
@@ -159,6 +159,9 @@ async function crawlVariant(page, baseUrl, visited, scannedUrls, found, pageResu
     const html = await fetchPage(page, url);
     if (!html) continue;
     scannedUrls.push(url);
+    if (progress) {
+      progress({ url, scanned: scannedUrls.length });
+    }
 
     const pageData = findAnalytics(html);
     mergeAnalytics(found, pageData);
@@ -220,7 +223,7 @@ async function scanVariants(variants, progress = () => {}, maxPages = DEFAULT_MA
       });
 
 
-      await crawlVariant(page, base, visited, scanned, found, pageResults, queue, maxPages);
+      await crawlVariant(page, base, visited, scanned, found, pageResults, queue, maxPages, progress);
 
     }
 
