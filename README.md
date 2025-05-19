@@ -23,6 +23,17 @@ The backend uses **Express** with the `cors` middleware so requests from any ori
 
 The Node.js implementation relies on **Puppeteer** to load pages in a real headless browser while scanning up to 500 pages per site.
 
+## Running with Docker
+
+To ensure the backend uses a compatible Node.js version, you can build a Docker image.
+
+```
+docker build -t analytics-doctor-backend .
+docker run -p 5000:5000 analytics-doctor-backend
+```
+
+The provided `Dockerfile` uses the official **Node 20** image so Puppeteer runs without socket issues on newer Node releases.
+
 ## Exposing with ngrok
 
 You can expose the local backend using **ngrok** so that the frontend can reach the API from the web:
