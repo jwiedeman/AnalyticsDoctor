@@ -132,6 +132,7 @@ async function fetchPage(page, url) {
       console.error(`Fallback request failed for ${url}:`, reqErr);
       return null;
     }
+
     console.error(`Failed to fetch ${url}:`, err);
     return null;
 
@@ -265,6 +266,7 @@ async function scanVariants(variants) {
   console.log('Scan summary:', summary);
   return summary;
 
+
   } finally {
     if (browser) {
       console.log('Closing browser');
@@ -285,6 +287,7 @@ async function scanVariants(variants) {
   const summary = { working_variants: working, scanned_urls: scanned, found_analytics: result };
   console.log('Scan summary:', summary);
   return summary;
+
 
 
 }
