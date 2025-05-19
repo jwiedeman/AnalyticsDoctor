@@ -4,7 +4,7 @@ This project provides a simple frontend and backend service for scanning a websi
 
 ## Structure
 
-- `frontend/` – A minimal static webpage that submits a domain to the backend and displays the JSON response.
+- `frontend/` – A minimal static webpage that submits a domain and desired page limit to the backend and displays the JSON response.
 - `backend-js/` – A Node.js backend that uses Puppeteer to crawl pages with a real headless browser and detect analytics libraries.
 
 
@@ -21,7 +21,7 @@ npm start
 
 The backend uses **Express** with the `cors` middleware so requests from any origin are allowed by default.
 
-The Node.js implementation relies on **Puppeteer** to load pages in a real headless browser while scanning up to 500 pages per site.
+The Node.js implementation relies on **Puppeteer** to load pages in a real headless browser while scanning a configurable number of pages (default 50, up to 250) per site.
 
 ## API Response
 

@@ -11,6 +11,8 @@
         <form id="scan-form">
             <label for="domain">Enter domain:</label>
             <input type="text" id="domain" name="domain" placeholder="example.com">
+            <label for="max-pages">Max pages (up to 250):</label>
+            <input type="number" id="max-pages" name="max-pages" min="1" max="250" value="50">
             <button type="submit">Scan</button>
         </form>
         <div id="status"></div>
