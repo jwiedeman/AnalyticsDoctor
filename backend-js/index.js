@@ -119,7 +119,7 @@ async function fetchPage(page, url) {
   }
 }
 
-async function crawlVariant(page, baseUrl, visited, scannedUrls, found, queue) {
+async function crawlVariant(page, baseUrl, visited, scannedUrls, found, queue, progress = () => {}) {
   const baseHost = new URL(baseUrl).host;
   while (queue.length && scannedUrls.length < MAX_PAGES) {
     const url = queue.shift();
@@ -130,6 +130,7 @@ async function crawlVariant(page, baseUrl, visited, scannedUrls, found, queue) {
     if (!html) continue;
     scannedUrls.push(url);
     mergeAnalytics(found, findAnalytics(html));
+    progress({ url, scanned: scannedUrls.length });
     const $ = cheerio.load(html);
     $('a[href]').each((_, el) => {
       const link = new URL($(el).attr('href'), url).href;
@@ -140,14 +141,18 @@ async function crawlVariant(page, baseUrl, visited, scannedUrls, found, queue) {
   }
 }
 
-async function scanVariants(variants) {
+async function scanVariants(variants, progress = () => {}) {
   console.log('Starting scan of variants:', variants);
   const scanned = [];
   const working = [];
   const found = {};
   const visited = new Set();
 
-  const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox'] });
+  const launchOpts = { headless: 'new', args: ['--no-sandbox'] };
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    launchOpts.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+  }
+  const browser = await puppeteer.launch(launchOpts);
   console.log('Browser launched');
   const page = await browser.newPage();
   await page.setUserAgent(USER_AGENT);
@@ -162,6 +167,7 @@ async function scanVariants(variants) {
       scanned.push(base);
       visited.add(base);
       mergeAnalytics(found, findAnalytics(html));
+      progress({ url: base, scanned: scanned.length });
 
       const $ = cheerio.load(html);
       const queue = [];
@@ -172,7 +178,7 @@ async function scanVariants(variants) {
         }
       });
 
-      await crawlVariant(page, base, visited, scanned, found, queue);
+      await crawlVariant(page, base, visited, scanned, found, queue, progress);
     }
 
     const result = {};
@@ -212,6 +218,34 @@ app.post('/scan', async (req, res) => {
   } catch (err) {
     console.error('Scan failed:', err);
     res.status(500).json({ error: err.toString() });
+  }
+});
+
+app.get('/scan-stream', async (req, res) => {
+  const domain = cleanDomain(req.query.domain || '');
+  const variants = Array.from(new Set([
+    `http://${domain}`,
+    `https://${domain}`,
+    `http://www.${domain}`,
+    `https://www.${domain}`
+  ].filter(Boolean)));
+  console.log('Streaming scan for variants:', variants);
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive'
+  });
+  res.flushHeaders();
+  try {
+    const result = await scanVariants(variants, update => {
+      res.write(`data: ${JSON.stringify(update)}\n\n`);
+    });
+    res.write(`data: ${JSON.stringify({ done: true, result })}\n\n`);
+    res.end();
+  } catch (err) {
+    console.error('Streaming scan failed:', err);
+    res.write(`event: error\ndata: ${JSON.stringify({ error: err.toString() })}\n\n`);
+    res.end();
   }
 });
 
