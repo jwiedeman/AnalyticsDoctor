@@ -120,9 +120,15 @@ async function scanVariants(variants) {
   const found = {};
   const visited = new Set();
 
-  const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox'] });
-  const page = await browser.newPage();
-  await page.setUserAgent(USER_AGENT);
+  let browser;
+  try {
+    console.log('Launching headless browser');
+    browser = await puppeteer.launch({
+      headless: 'new',
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+    });
+    const page = await browser.newPage();
+    await page.setUserAgent(USER_AGENT);
 
   for (const base of variants) {
     if (scanned.length >= MAX_PAGES) break;
@@ -146,7 +152,12 @@ async function scanVariants(variants) {
     await crawlVariant(page, base, visited, scanned, found, queue);
   }
 
-  await browser.close();
+  } finally {
+    if (browser) {
+      console.log('Closing browser');
+      await browser.close();
+    }
+  }
 
   const result = {};
   for (const [name, data] of Object.entries(found)) {
