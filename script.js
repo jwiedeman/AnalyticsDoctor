@@ -7,14 +7,85 @@ const ANALYTICS_KEYS = [
     'bing'
 ];
 
+const STORAGE_KEY = 'analyticsColumns';
+let selectedColumns = [...ANALYTICS_KEYS];
+let lastResult = null;
+
+function loadSelected() {
+    try {
+        const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        if (Array.isArray(stored)) {
+            selectedColumns = ANALYTICS_KEYS.filter(k => stored.includes(k));
+            if (selectedColumns.length === 0) {
+                selectedColumns = [...ANALYTICS_KEYS];
+            }
+        }
+    } catch (e) {
+        selectedColumns = [...ANALYTICS_KEYS];
+    }
+}
+
+function saveSelected() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(selectedColumns));
+}
+
 function formatName(key) {
     return key
         .replace(/_/g, ' ')
         .replace(/\b\w/g, c => c.toUpperCase());
 }
 
+function renderFilter() {
+    const panel = document.getElementById('filter-panel');
+    if (!panel) return;
+    panel.innerHTML = '';
+
+    const allBtn = document.createElement('button');
+    allBtn.type = 'button';
+    allBtn.textContent = 'Select All';
+    allBtn.addEventListener('click', () => {
+        selectedColumns = [...ANALYTICS_KEYS];
+        saveSelected();
+        renderFilter();
+        if (lastResult) renderResults(lastResult);
+    });
+    panel.appendChild(allBtn);
+
+    const clearBtn = document.createElement('button');
+    clearBtn.type = 'button';
+    clearBtn.textContent = 'Clear';
+    clearBtn.addEventListener('click', () => {
+        selectedColumns = [];
+        saveSelected();
+        renderFilter();
+        if (lastResult) renderResults(lastResult);
+    });
+    panel.appendChild(clearBtn);
+
+    ANALYTICS_KEYS.forEach(key => {
+        const label = document.createElement('label');
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.value = key;
+        checkbox.checked = selectedColumns.includes(key);
+        checkbox.addEventListener('change', () => {
+            if (checkbox.checked) {
+                if (!selectedColumns.includes(key)) selectedColumns.push(key);
+            } else {
+                selectedColumns = selectedColumns.filter(k => k !== key);
+            }
+            saveSelected();
+            if (lastResult) renderResults(lastResult);
+        });
+        label.appendChild(checkbox);
+        label.appendChild(document.createTextNode(' ' + formatName(key)));
+        panel.appendChild(label);
+    });
+}
+
 
 function renderResults(data) {
+    lastResult = data;
     const headerRow = document.getElementById('pages-header');
     const bodyEl = document.getElementById('pages-body');
     const summaryEl = document.getElementById('summary');
@@ -24,7 +95,7 @@ function renderResults(data) {
     summaryEl.innerHTML = '';
 
     headerRow.appendChild(document.createElement('th')).textContent = 'URL';
-    ANALYTICS_KEYS.forEach(key => {
+    selectedColumns.forEach(key => {
         const th = document.createElement('th');
         th.textContent = formatName(key);
         headerRow.appendChild(th);
@@ -36,7 +107,7 @@ function renderResults(data) {
             const urlCell = document.createElement('td');
             urlCell.textContent = url;
             tr.appendChild(urlCell);
-            ANALYTICS_KEYS.forEach(key => {
+            selectedColumns.forEach(key => {
                 const td = document.createElement('td');
                 const entry = analytics[key];
                 if (entry) {
@@ -94,3 +165,7 @@ document.getElementById('scan-form').addEventListener('submit', (event) => {
         es.close();
     };
 });
+
+loadSelected();
+renderFilter();
+
