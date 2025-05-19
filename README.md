@@ -22,8 +22,6 @@ The backend uses **flask-cors** to allow requests from the static frontend. If
 you are serving the frontend from a different origin, the API will be
 accessible without additional configuration.
 
-=======
-
 ## Exposing with ngrok
 
 You can expose the local backend using ngrok:
@@ -33,6 +31,7 @@ ngrok http 5000
 ```
 
 Take the HTTPS URL provided by ngrok and update `frontend/script.js` to use that endpoint instead of `http://localhost:5000`.
+Set the `API_BASE_URL` constant in `frontend/script.js` to the public URL of the backend, for example the HTTPS address provided by ngrok.
 
 ## Serving the Frontend
 
