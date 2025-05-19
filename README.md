@@ -49,6 +49,16 @@ The Dockerfile installs the system `chromium` package and sets
 This avoids architecture issues (for example when building on Apple Silicon)
 and ensures scans run reliably.
 
+
+## Live progress updates
+
+The backend exposes `/scan-stream` which streams progress updates using
+**Server-Sent Events**. The frontend listens to this endpoint so each scanned
+page is reported in real time. When the scan finishes, the full summary is
+sent and the connection closes.
+
+
+
 ## Exposing with ngrok
 
 You can expose the local backend using **ngrok** so that the frontend can reach the API from the web:

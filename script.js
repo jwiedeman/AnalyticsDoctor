@@ -1,9 +1,10 @@
 const API_BASE_URL = 'https://3401-24-20-99-62.ngrok-free.app';
 
-document.getElementById('scan-form').addEventListener('submit', async (event) => {
+document.getElementById('scan-form').addEventListener('submit', (event) => {
     event.preventDefault();
-    const domain = document.getElementById('domain').value;
+    const domain = document.getElementById('domain').value.trim();
     const resultEl = document.getElementById('result');
+
     const pagesEl = document.getElementById('pages');
     resultEl.textContent = 'Scanning...';
     pagesEl.innerHTML = '';
@@ -29,4 +30,5 @@ document.getElementById('scan-form').addEventListener('submit', async (event) =>
     } catch (err) {
         resultEl.textContent = 'Error: ' + err.toString();
     }
+
 });
