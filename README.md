@@ -22,6 +22,9 @@ The backend uses **flask-cors** to allow requests from the static frontend. If
 you are serving the frontend from a different origin, the API will be
 accessible without additional configuration.
 
+The crawler now uses **aiohttp** to fetch pages asynchronously so multiple
+requests can be processed concurrently while scanning up to 500 pages per site.
+
 ## Exposing with ngrok
 
 You can expose the local backend using **ngrok** so that the frontend can reach the API from the web:
