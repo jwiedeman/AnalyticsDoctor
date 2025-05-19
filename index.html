@@ -3,12 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <title>Analytics Doctor</title>
-    <link rel="stylesheet" href="https://unpkg.com/carbon-components/css/carbon-components.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="container bx--content">
+    <header class="site-header">
         <h1>Analytics Doctor</h1>
+    </header>
+    <main class="container">
         <form id="scan-form">
             <label for="domain">Enter domain:</label>
             <input type="text" id="domain" name="domain" placeholder="example.com">
@@ -19,13 +21,13 @@
         <div id="status"></div>
         <div id="filter-panel" class="filter-panel"></div>
         <div id="summary" class="summary-panel"></div>
-        <table id="pages-table" class="bx--data-table bx--data-table--no-border">
+        <table id="pages-table">
             <thead>
                 <tr id="pages-header"></tr>
             </thead>
             <tbody id="pages-body"></tbody>
         </table>
-    </div>
+    </main>
     <script src="script.js"></script>
 </body>
 </html>
