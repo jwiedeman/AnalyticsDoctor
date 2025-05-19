@@ -6,7 +6,8 @@ const { URL } = require('url');
 const http = require('http');
 const https = require('https');
 
-const MAX_PAGES = 500;
+const DEFAULT_MAX_PAGES = 50;
+const MAX_ALLOWED_PAGES = 250;
 const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36';
 
@@ -68,7 +69,26 @@ function findAnalytics(html) {
   }
 
   if (detected.google_analytics) {
-    detected.google_analytics.method = detected.google_tag_manager ? 'via gtm' : 'native';
+    if (detected.google_tag_manager) {
+      detected.google_analytics.method = 'via gtm';
+    } else if (detected.segment) {
+      detected.google_analytics.method = 'via segment';
+    } else {
+      detected.google_analytics.method = 'native';
+    }
+  }
+
+  if (detected.google_tag_manager && !detected.google_tag_manager.method) {
+    detected.google_tag_manager.method = 'native';
+  }
+  if (detected.segment && !detected.segment.method) {
+    detected.segment.method = 'native';
+  }
+  if (detected.meta_pixel && !detected.meta_pixel.method) {
+    detected.meta_pixel.method = 'native';
+  }
+  if (detected.bing && !detected.bing.method) {
+    detected.bing.method = 'native';
   }
 
   return detected;
@@ -128,10 +148,10 @@ async function fetchPage(page, url) {
 }
 
 
-async function crawlVariant(page, baseUrl, visited, scannedUrls, found, queue, progress = () => {}) {
+async function crawlVariant(page, baseUrl, visited, scannedUrls, found, pageResults, queue, maxPages) {
 
   const baseHost = new URL(baseUrl).host;
-  while (queue.length && scannedUrls.length < MAX_PAGES) {
+  while (queue.length && scannedUrls.length < maxPages) {
     const url = queue.shift();
     console.log('Crawling:', url);
     if (visited.has(url)) continue;
@@ -148,14 +168,14 @@ async function crawlVariant(page, baseUrl, visited, scannedUrls, found, queue, p
     const $ = cheerio.load(html);
     $('a[href]').each((_, el) => {
       const link = new URL($(el).attr('href'), url).href;
-      if (new URL(link).host === baseHost && !visited.has(link) && scannedUrls.length + queue.length < MAX_PAGES) {
+      if (new URL(link).host === baseHost && !visited.has(link) && scannedUrls.length + queue.length < maxPages) {
         queue.push(link);
       }
     });
   }
 }
 
-async function scanVariants(variants, progress = () => {}) {
+async function scanVariants(variants, progress = () => {}, maxPages = DEFAULT_MAX_PAGES) {
   console.log('Starting scan of variants:', variants);
   const scanned = [];
   const working = [];
@@ -174,7 +194,7 @@ async function scanVariants(variants, progress = () => {}) {
 
   try {
     for (const base of variants) {
-      if (scanned.length >= MAX_PAGES) break;
+      if (scanned.length >= maxPages) break;
       console.log('Scanning base URL:', base);
       const html = await fetchPage(page, base);
       if (!html) continue;
@@ -200,7 +220,7 @@ async function scanVariants(variants, progress = () => {}) {
       });
 
 
-      await crawlVariant(page, base, visited, scanned, found, pageResults, queue);
+      await crawlVariant(page, base, visited, scanned, found, pageResults, queue, maxPages);
 
     }
 
@@ -233,6 +253,11 @@ app.use((req, res, next) => {
 
 app.post('/scan', async (req, res) => {
   const domain = cleanDomain(req.body.domain || '');
+  const maxPagesInput = parseInt(req.body.maxPages, 10);
+  const maxPages = Math.min(
+    MAX_ALLOWED_PAGES,
+    isNaN(maxPagesInput) ? DEFAULT_MAX_PAGES : Math.max(1, maxPagesInput)
+  );
   const variants = Array.from(new Set([
     `http://${domain}`,
     `https://${domain}`,
@@ -241,7 +266,7 @@ app.post('/scan', async (req, res) => {
   ].filter(Boolean)));
   console.log('Scanning variants:', variants);
   try {
-    const result = await scanVariants(variants);
+    const result = await scanVariants(variants, undefined, maxPages);
     res.json(result);
   } catch (err) {
     console.error('Scan failed:', err);
@@ -251,6 +276,11 @@ app.post('/scan', async (req, res) => {
 
 app.get('/scan-stream', async (req, res) => {
   const domain = cleanDomain(req.query.domain || '');
+  const maxPagesInput = parseInt(req.query.maxPages, 10);
+  const maxPages = Math.min(
+    MAX_ALLOWED_PAGES,
+    isNaN(maxPagesInput) ? DEFAULT_MAX_PAGES : Math.max(1, maxPagesInput)
+  );
   const variants = Array.from(new Set([
     `http://${domain}`,
     `https://${domain}`,
@@ -267,7 +297,7 @@ app.get('/scan-stream', async (req, res) => {
   try {
     const result = await scanVariants(variants, update => {
       res.write(`data: ${JSON.stringify(update)}\n\n`);
-    });
+    }, maxPages);
     res.write(`data: ${JSON.stringify({ done: true, result })}\n\n`);
     res.end();
   } catch (err) {

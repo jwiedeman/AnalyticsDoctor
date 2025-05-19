@@ -17,6 +17,7 @@ function formatName(key) {
 document.getElementById('scan-form').addEventListener('submit', async (event) => {
     event.preventDefault();
     const domain = document.getElementById('domain').value.trim();
+    const maxPages = parseInt(document.getElementById('max-pages').value, 10) || 50;
     const statusEl = document.getElementById('status');
     const headerRow = document.getElementById('pages-header');
     const bodyEl = document.getElementById('pages-body');
@@ -31,7 +32,7 @@ document.getElementById('scan-form').addEventListener('submit', async (event) =>
         const response = await fetch(`${API_BASE_URL}/scan`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ domain })
+            body: JSON.stringify({ domain, maxPages })
         });
         const data = await response.json();
 
@@ -50,7 +51,12 @@ document.getElementById('scan-form').addEventListener('submit', async (event) =>
                 tr.appendChild(urlCell);
                 ANALYTICS_KEYS.forEach(key => {
                     const td = document.createElement('td');
-                    td.textContent = analytics[key] ? '✔' : '';
+                    const entry = analytics[key];
+                    if (entry) {
+                        td.textContent = entry.method || 'native';
+                    } else {
+                        td.textContent = '';
+                    }
                     tr.appendChild(td);
                 });
                 bodyEl.appendChild(tr);
