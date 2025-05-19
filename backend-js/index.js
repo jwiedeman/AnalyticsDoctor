@@ -110,6 +110,8 @@ async function fetchPage(page, url) {
       console.error(`Fallback request failed for ${url}:`, reqErr);
       return null;
     }
+    console.error(`Failed to fetch ${url}:`, err);
+    return null;
   }
 }
 
@@ -172,6 +174,46 @@ async function scanVariants(variants) {
       result[name] = { ids: Array.from(data.ids), method: data.method };
     }
 
+  let browser;
+  try {
+    console.log('Launching headless browser');
+    browser = await puppeteer.launch({
+      headless: 'new',
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+    });
+    const page = await browser.newPage();
+    await page.setUserAgent(USER_AGENT);
+
+  for (const base of variants) {
+    if (scanned.length >= MAX_PAGES) break;
+    console.log('Scanning base URL:', base);
+    const html = await fetchPage(page, base);
+    if (!html) continue;
+    working.push(base);
+    scanned.push(base);
+    visited.add(base);
+    mergeAnalytics(found, findAnalytics(html));
+
+    const $ = cheerio.load(html);
+    const queue = [];
+    $('a[href]').each((_, el) => {
+      const link = new URL($(el).attr('href'), base).href;
+      if (new URL(link).host === new URL(base).host && !visited.has(link)) {
+        queue.push(link);
+      }
+    });
+
+    await crawlVariant(page, base, visited, scanned, found, queue);
+  }
+
+  } finally {
+    if (browser) {
+      console.log('Closing browser');
+      await browser.close();
+    }
+  }
+
+
     const summary = { working_variants: working, scanned_urls: scanned, found_analytics: result };
     console.log('Scan summary:', summary);
     return summary;
@@ -179,6 +221,12 @@ async function scanVariants(variants) {
     await browser.close();
     console.log('Browser closed');
   }
+
+
+  const summary = { working_variants: working, scanned_urls: scanned, found_analytics: result };
+  console.log('Scan summary:', summary);
+  return summary;
+
 }
 
 const app = express();
