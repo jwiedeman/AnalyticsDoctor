@@ -34,12 +34,25 @@ button {
     font-weight: bold;
 }
 
-#pages details {
-    margin-bottom: 0.5rem;
+#pages-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1rem;
 }
 
-pre {
+#pages-table th,
+#pages-table td {
+    border: 1px solid #ddd;
+    padding: 0.5rem;
+    text-align: left;
+}
+
+#pages-table th {
+    background: #f0f0f0;
+}
+
+.summary-panel {
     background: #f5f5f5;
-    padding: 1em;
-    overflow: auto;
+    padding: 1rem;
+    border-radius: 4px;
 }
