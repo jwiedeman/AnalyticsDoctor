@@ -83,9 +83,11 @@ function mergeAnalytics(target, pageData) {
 
 async function fetchPage(page, url) {
   try {
+    console.log(`Fetching ${url}`);
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 10000 });
     return await page.content();
-  } catch {
+  } catch (err) {
+    console.error(`Failed to fetch ${url}:`, err);
     return null;
   }
 }
@@ -94,6 +96,7 @@ async function crawlVariant(page, baseUrl, visited, scannedUrls, found, queue) {
   const baseHost = new URL(baseUrl).host;
   while (queue.length && scannedUrls.length < MAX_PAGES) {
     const url = queue.shift();
+    console.log('Crawling:', url);
     if (visited.has(url)) continue;
     visited.add(url);
     const html = await fetchPage(page, url);
@@ -111,17 +114,25 @@ async function crawlVariant(page, baseUrl, visited, scannedUrls, found, queue) {
 }
 
 async function scanVariants(variants) {
+  console.log('Starting scan of variants:', variants);
   const scanned = [];
   const working = [];
   const found = {};
   const visited = new Set();
 
-  const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox'] });
-  const page = await browser.newPage();
-  await page.setUserAgent(USER_AGENT);
+  let browser;
+  try {
+    console.log('Launching headless browser');
+    browser = await puppeteer.launch({
+      headless: 'new',
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+    });
+    const page = await browser.newPage();
+    await page.setUserAgent(USER_AGENT);
 
   for (const base of variants) {
     if (scanned.length >= MAX_PAGES) break;
+    console.log('Scanning base URL:', base);
     const html = await fetchPage(page, base);
     if (!html) continue;
     working.push(base);
@@ -141,19 +152,30 @@ async function scanVariants(variants) {
     await crawlVariant(page, base, visited, scanned, found, queue);
   }
 
-  await browser.close();
+  } finally {
+    if (browser) {
+      console.log('Closing browser');
+      await browser.close();
+    }
+  }
 
   const result = {};
   for (const [name, data] of Object.entries(found)) {
     result[name] = { ids: Array.from(data.ids), method: data.method };
   }
 
-  return { working_variants: working, scanned_urls: scanned, found_analytics: result };
+  const summary = { working_variants: working, scanned_urls: scanned, found_analytics: result };
+  console.log('Scan summary:', summary);
+  return summary;
 }
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use((req, res, next) => {
+  console.log(`Incoming ${req.method} ${req.url}`, req.body);
+  next();
+});
 
 app.post('/scan', async (req, res) => {
   const domain = cleanDomain(req.body.domain || '');
@@ -163,10 +185,12 @@ app.post('/scan', async (req, res) => {
     `http://www.${domain}`,
     `https://www.${domain}`
   ].filter(Boolean)));
+  console.log('Scanning variants:', variants);
   try {
     const result = await scanVariants(variants);
     res.json(result);
   } catch (err) {
+    console.error('Scan failed:', err);
     res.status(500).json({ error: err.toString() });
   }
 });
