@@ -30,6 +30,7 @@ To ensure the backend uses a compatible Node.js version, you can build a Docker 
 ```
 docker build -t analytics-doctor-backend .
 docker run -p 5005:5005 analytics-doctor-backend
+
 ```
 
 The provided `Dockerfile` uses the official **Node 20** image so Puppeteer runs without socket issues on newer Node releases.
