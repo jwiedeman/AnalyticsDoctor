@@ -33,7 +33,10 @@ docker run -p 5005:5005 analytics-doctor-backend
 
 ```
 
-The provided `Dockerfile` uses the official **Node 20** image so Puppeteer runs without socket issues on newer Node releases.
+The Dockerfile installs the system `chromium` package and sets
+`PUPPETEER_EXECUTABLE_PATH` so Puppeteer launches the correct browser.
+This avoids architecture issues (for example when building on Apple Silicon)
+and ensures scans run reliably.
 
 ## Exposing with ngrok
 

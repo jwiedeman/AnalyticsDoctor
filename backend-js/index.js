@@ -147,7 +147,11 @@ async function scanVariants(variants) {
   const found = {};
   const visited = new Set();
 
-  const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox'] });
+  const launchOpts = { headless: 'new', args: ['--no-sandbox'] };
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    launchOpts.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+  }
+  const browser = await puppeteer.launch(launchOpts);
   console.log('Browser launched');
   const page = await browser.newPage();
   await page.setUserAgent(USER_AGENT);
