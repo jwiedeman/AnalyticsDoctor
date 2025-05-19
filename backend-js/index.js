@@ -152,6 +152,62 @@ function directFetch(url) {
   });
 }
 
+function fetchRedirectChain(url, chain = [], maxRedirects = 5) {
+  const lib = url.startsWith('https') ? https : http;
+  return new Promise((resolve, reject) => {
+    const req = lib.get(url, res => {
+      chain.push({ url, status: res.statusCode });
+      if (
+        res.statusCode >= 300 &&
+        res.statusCode < 400 &&
+        res.headers.location &&
+        maxRedirects > 0
+      ) {
+        const nextUrl = new URL(res.headers.location, url).toString();
+        res.resume();
+        fetchRedirectChain(nextUrl, chain, maxRedirects - 1)
+          .then(resolve)
+          .catch(reject);
+        return;
+      }
+      res.resume();
+      resolve({ status: res.statusCode, finalUrl: url, chain });
+    });
+    req.on('error', err => {
+      chain.push({ url, error: err.message });
+      reject({ error: err.message, chain });
+    });
+  });
+}
+
+async function resolveVariants(domain) {
+  const results = {};
+  const working = [];
+  const hosts = [domain, `www.${domain}`];
+  for (const host of hosts) {
+    let success = false;
+    for (const scheme of ['https', 'http']) {
+      const url = `${scheme}://${host}`;
+      try {
+        const info = await fetchRedirectChain(url);
+        results[url] = {
+          status: info.status,
+          final_url: info.finalUrl,
+          chain: info.chain
+        };
+        if (!success && info.status < 400) {
+          working.push(info.finalUrl);
+          success = true;
+        }
+        if (info.status < 400) break;
+      } catch (err) {
+        results[url] = { error: err.error || err.message, chain: err.chain };
+      }
+    }
+  }
+  return { working: Array.from(new Set(working)), variantResults: results };
+}
+
 async function fetchPage(page, url) {
   try {
     console.log(`Fetching ${url}`);
@@ -283,15 +339,19 @@ app.post('/scan', async (req, res) => {
     MAX_ALLOWED_PAGES,
     isNaN(maxPagesInput) ? DEFAULT_MAX_PAGES : Math.max(1, maxPagesInput)
   );
-  const variants = Array.from(new Set([
-    `http://${domain}`,
-    `https://${domain}`,
-    `http://www.${domain}`,
-    `https://www.${domain}`
-  ].filter(Boolean)));
-  console.log('Scanning variants:', variants);
   try {
-    const result = await scanVariants(variants, undefined, maxPages);
+    const { working, variantResults } = await resolveVariants(domain);
+    console.log('Resolved variants:', working);
+    let result = {
+      working_variants: [],
+      scanned_urls: [],
+      found_analytics: {},
+      page_results: {}
+    };
+    if (working.length) {
+      result = await scanVariants(working, undefined, maxPages);
+    }
+    result.variant_results = variantResults;
     res.json(result);
   } catch (err) {
     console.error('Scan failed:', err);
@@ -306,13 +366,7 @@ app.get('/scan-stream', async (req, res) => {
     MAX_ALLOWED_PAGES,
     isNaN(maxPagesInput) ? DEFAULT_MAX_PAGES : Math.max(1, maxPagesInput)
   );
-  const variants = Array.from(new Set([
-    `http://${domain}`,
-    `https://${domain}`,
-    `http://www.${domain}`,
-    `https://www.${domain}`
-  ].filter(Boolean)));
-  console.log('Streaming scan for variants:', variants);
+  console.log('Streaming scan for domain:', domain);
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
@@ -320,9 +374,20 @@ app.get('/scan-stream', async (req, res) => {
   });
   res.flushHeaders();
   try {
-    const result = await scanVariants(variants, update => {
-      res.write(`data: ${JSON.stringify(update)}\n\n`);
-    }, maxPages);
+    const { working, variantResults } = await resolveVariants(domain);
+    res.write(`data: ${JSON.stringify({ variant_results: variantResults })}\n\n`);
+    let result = {
+      working_variants: [],
+      scanned_urls: [],
+      found_analytics: {},
+      page_results: {}
+    };
+    if (working.length) {
+      result = await scanVariants(working, update => {
+        res.write(`data: ${JSON.stringify(update)}\n\n`);
+      }, maxPages);
+    }
+    result.variant_results = variantResults;
     res.write(`data: ${JSON.stringify({ done: true, result })}\n\n`);
     res.end();
   } catch (err) {

@@ -29,6 +29,8 @@ The `/scan` endpoint returns JSON describing the analytics detected. The object
 has these fields:
 
 - `working_variants` – which domain variants responded successfully
+- `variant_results` – for each http/https and www/non-www variant, the status
+  code, final URL and full redirect chain
 - `scanned_urls` – every page that was crawled
 - `found_analytics` – aggregated analytics IDs and detection methods
 - `page_results` – mapping of each scanned URL to the analytics found on that

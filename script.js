@@ -132,6 +132,32 @@ function renderResults(data) {
     const summaryTitle = document.createElement('h2');
     summaryTitle.textContent = 'Summary';
     summaryEl.appendChild(summaryTitle);
+    if (data.variant_results) {
+        const variantTitle = document.createElement('h3');
+        variantTitle.textContent = 'Variant Status';
+        summaryEl.appendChild(variantTitle);
+        const vlist = document.createElement('ul');
+        for (const [variant, info] of Object.entries(data.variant_results)) {
+            const li = document.createElement('li');
+            if (info.error) {
+                li.textContent = `${variant} -> error: ${info.error}`;
+            } else if (info.chain && Array.isArray(info.chain)) {
+                let text = variant;
+                for (let i = 0; i < info.chain.length; i++) {
+                    const step = info.chain[i];
+                    text += ` -> ${step.status}`;
+                    if (i < info.chain.length - 1) {
+                        text += ` to ${info.chain[i + 1].url}`;
+                    }
+                }
+                li.textContent = text;
+            } else {
+                li.textContent = `${variant} -> ${info.status}`;
+            }
+            vlist.appendChild(li);
+        }
+        summaryEl.appendChild(vlist);
+    }
     const ul = document.createElement('ul');
     if (data.found_analytics) {
         for (const [name, info] of Object.entries(data.found_analytics)) {
