@@ -1,6 +1,6 @@
 const API_BASE_URL = 'https://3401-24-20-99-62.ngrok-free.app';
 
-document.getElementById('scan-form').addEventListener('submit', (event) => {
+document.getElementById('scan-form').addEventListener('submit', async (event) => {
     event.preventDefault();
     const domain = document.getElementById('domain').value.trim();
     const resultEl = document.getElementById('result');
