@@ -4,7 +4,11 @@ const ANALYTICS_KEYS = [
     'google_tag_manager',
     'segment',
     'meta_pixel',
-    'bing'
+    'bing',
+    'adobe_analytics',
+    'mixpanel',
+    'hotjar',
+    'amplitude'
 ];
 
 const STORAGE_KEY = 'analyticsColumns';

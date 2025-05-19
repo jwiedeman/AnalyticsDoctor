@@ -1,6 +1,6 @@
 # Analytics Doctor
 
-This project provides a simple frontend and backend service for scanning a website for common analytics libraries. It is a work in progress and only implements a basic crawler and detector for Google Analytics, Google Tag Manager, Segment, Meta Pixel and Bing scripts.
+This project provides a simple frontend and backend service for scanning a website for common analytics libraries. It is a work in progress and currently detects Google Analytics, Google Tag Manager, Segment, Meta Pixel, Bing, Adobe Analytics, Mixpanel, Hotjar and Amplitude scripts.
 
 ## Structure
 
