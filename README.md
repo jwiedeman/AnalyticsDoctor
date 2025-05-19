@@ -45,6 +45,7 @@ The backend exposes `/scan-stream` which streams progress updates using
 page is reported in real time. When the scan finishes, the full summary is
 sent and the connection closes.
 
+
 ## Exposing with ngrok
 
 You can expose the local backend using **ngrok** so that the frontend can reach the API from the web:
