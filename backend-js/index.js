@@ -215,7 +215,9 @@ app.post('/scan', async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 5000;
+// The backend defaults to port 5005 so it does not conflict with other
+// services that may use port 5000 on the host machine.
+const PORT = process.env.PORT || 5005;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
