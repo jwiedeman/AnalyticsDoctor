@@ -190,6 +190,16 @@ document.getElementById('scan-form').addEventListener('submit', (event) => {
 
     const es = new EventSource(`${API_BASE_URL}/scan-stream?domain=${encodeURIComponent(domain)}&maxPages=${maxPages}`);
     let startTime = null;
+    es.addEventListener('queue', (e) => {
+        const data = JSON.parse(e.data);
+        if (data.position > 0) {
+            statusEl.textContent = `Queued... position ${data.position}`;
+            progressBar.style.width = '0%';
+            etaEl.textContent = '';
+        } else {
+            statusEl.textContent = 'Starting page scan...';
+        }
+    });
     es.onmessage = (e) => {
         const data = JSON.parse(e.data);
         if (data.done) {

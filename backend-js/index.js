@@ -6,6 +6,71 @@ const { URL } = require('url');
 const http = require('http');
 const https = require('https');
 
+const MAX_CONCURRENT_SCANS =
+  parseInt(process.env.MAX_CONCURRENT_SCANS, 10) || 2;
+
+const activeJobs = new Set();
+const jobQueue = [];
+
+function broadcastQueue() {
+  jobQueue.forEach((job, idx) => {
+    try {
+      job.res.write(
+        `event: queue\ndata: ${JSON.stringify({ position: idx + 1 })}\n\n`
+      );
+    } catch (_) {}
+  });
+}
+
+function runNext() {
+  while (activeJobs.size < MAX_CONCURRENT_SCANS && jobQueue.length) {
+    const job = jobQueue.shift();
+    activeJobs.add(job);
+    job.running = true;
+    job.res.write(`event: queue\ndata: ${JSON.stringify({ position: 0 })}\n\n`);
+    startJob(job);
+  }
+  broadcastQueue();
+}
+
+async function startJob(job) {
+  const { domain, maxPages, res } = job;
+  try {
+    const { working, variantResults } = await resolveVariants(domain);
+    res.write(`data: ${JSON.stringify({ variant_results: variantResults })}\n\n`);
+    let result = {
+      working_variants: [],
+      scanned_urls: [],
+      found_analytics: {},
+      page_results: {}
+    };
+    if (working.length) {
+      result = await scanVariants(
+        working,
+        update => {
+          res.write(`data: ${JSON.stringify(update)}\n\n`);
+        },
+        maxPages
+      );
+    }
+    result.variant_results = variantResults;
+    res.write(`data: ${JSON.stringify({ done: true, result })}\n\n`);
+    res.end();
+  } catch (err) {
+    console.error('Streaming scan failed:', err);
+    try {
+      res.write(
+        `event: error\ndata: ${JSON.stringify({ error: err.toString() })}\n\n`
+      );
+    } finally {
+      res.end();
+    }
+  } finally {
+    activeJobs.delete(job);
+    runNext();
+  }
+}
+
 const DEFAULT_MAX_PAGES = 50;
 const MAX_ALLOWED_PAGES = 250;
 const USER_AGENT =
@@ -365,42 +430,35 @@ app.post('/scan', async (req, res) => {
   }
 });
 
-app.get('/scan-stream', async (req, res) => {
+app.get('/scan-stream', (req, res) => {
   const domain = cleanDomain(req.query.domain || '');
   const maxPagesInput = parseInt(req.query.maxPages, 10);
   const maxPages = Math.min(
     MAX_ALLOWED_PAGES,
     isNaN(maxPagesInput) ? DEFAULT_MAX_PAGES : Math.max(1, maxPagesInput)
   );
-  console.log('Streaming scan for domain:', domain);
+  console.log('Queueing streaming scan for domain:', domain);
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     Connection: 'keep-alive'
   });
   res.flushHeaders();
-  try {
-    const { working, variantResults } = await resolveVariants(domain);
-    res.write(`data: ${JSON.stringify({ variant_results: variantResults })}\n\n`);
-    let result = {
-      working_variants: [],
-      scanned_urls: [],
-      found_analytics: {},
-      page_results: {}
-    };
-    if (working.length) {
-      result = await scanVariants(working, update => {
-        res.write(`data: ${JSON.stringify(update)}\n\n`);
-      }, maxPages);
+
+  const job = { domain, maxPages, res, running: false };
+  jobQueue.push(job);
+  broadcastQueue();
+  runNext();
+
+  res.on('close', () => {
+    if (!job.running) {
+      const idx = jobQueue.indexOf(job);
+      if (idx !== -1) {
+        jobQueue.splice(idx, 1);
+        broadcastQueue();
+      }
     }
-    result.variant_results = variantResults;
-    res.write(`data: ${JSON.stringify({ done: true, result })}\n\n`);
-    res.end();
-  } catch (err) {
-    console.error('Streaming scan failed:', err);
-    res.write(`event: error\ndata: ${JSON.stringify({ error: err.toString() })}\n\n`);
-    res.end();
-  }
+  });
 });
 
 // The backend defaults to port 5005 so it does not conflict with other
