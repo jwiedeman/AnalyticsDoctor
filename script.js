@@ -178,21 +178,38 @@ document.getElementById('scan-form').addEventListener('submit', (event) => {
     const domain = document.getElementById('domain').value.trim();
     const maxPages = parseInt(document.getElementById('max-pages').value, 10) || 50;
     const statusEl = document.getElementById('status');
+    const progressBar = document.getElementById('progress-bar');
+    const etaEl = document.getElementById('eta');
 
-    statusEl.textContent = 'Scanning...';
+    statusEl.textContent = 'Resolving domain variants...';
+    progressBar.style.width = '0%';
+    etaEl.textContent = '';
     document.getElementById('pages-header').innerHTML = '';
     document.getElementById('pages-body').innerHTML = '';
     document.getElementById('summary').innerHTML = '';
 
     const es = new EventSource(`${API_BASE_URL}/scan-stream?domain=${encodeURIComponent(domain)}&maxPages=${maxPages}`);
+    let startTime = null;
     es.onmessage = (e) => {
         const data = JSON.parse(e.data);
         if (data.done) {
             es.close();
             renderResults(data.result);
             statusEl.textContent = 'Scan complete';
-        } else {
+            progressBar.style.width = '100%';
+            etaEl.textContent = '';
+        } else if (typeof data.scanned !== 'undefined') {
+            if (!startTime) startTime = Date.now();
             statusEl.textContent = `Scanned ${data.scanned}: ${data.url}`;
+            const percent = Math.min(100, (data.scanned / maxPages) * 100);
+            progressBar.style.width = percent + '%';
+
+            const elapsed = (Date.now() - startTime) / 1000;
+            const total = (elapsed / data.scanned) * maxPages;
+            const remaining = Math.max(0, total - elapsed);
+            etaEl.textContent = `Estimated time remaining: ${Math.round(remaining)}s`;
+        } else if (data.variant_results) {
+            statusEl.textContent = 'Starting page scan...';
         }
     };
     es.onerror = () => {
