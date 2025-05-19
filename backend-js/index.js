@@ -83,6 +83,14 @@ function mergeAnalytics(target, pageData) {
   }
 }
 
+function serializeAnalytics(data) {
+  const out = {};
+  for (const [name, info] of Object.entries(data)) {
+    out[name] = { ids: Array.from(info.ids), method: info.method };
+  }
+  return out;
+}
+
 function directFetch(url) {
   const lib = url.startsWith('https') ? https : http;
   return new Promise((resolve, reject) => {
@@ -119,7 +127,9 @@ async function fetchPage(page, url) {
   }
 }
 
+
 async function crawlVariant(page, baseUrl, visited, scannedUrls, found, queue, progress = () => {}) {
+
   const baseHost = new URL(baseUrl).host;
   while (queue.length && scannedUrls.length < MAX_PAGES) {
     const url = queue.shift();
@@ -129,8 +139,12 @@ async function crawlVariant(page, baseUrl, visited, scannedUrls, found, queue, p
     const html = await fetchPage(page, url);
     if (!html) continue;
     scannedUrls.push(url);
-    mergeAnalytics(found, findAnalytics(html));
-    progress({ url, scanned: scannedUrls.length });
+
+    const pageData = findAnalytics(html);
+    mergeAnalytics(found, pageData);
+    pageResults[url] = serializeAnalytics(pageData);
+
+
     const $ = cheerio.load(html);
     $('a[href]').each((_, el) => {
       const link = new URL($(el).attr('href'), url).href;
@@ -146,6 +160,7 @@ async function scanVariants(variants, progress = () => {}) {
   const scanned = [];
   const working = [];
   const found = {};
+  const pageResults = {};
   const visited = new Set();
 
   const launchOpts = { headless: 'new', args: ['--no-sandbox'] };
@@ -166,8 +181,14 @@ async function scanVariants(variants, progress = () => {}) {
       working.push(base);
       scanned.push(base);
       visited.add(base);
+
+      const baseData = findAnalytics(html);
+      mergeAnalytics(found, baseData);
+      pageResults[base] = serializeAnalytics(baseData);
+
       mergeAnalytics(found, findAnalytics(html));
       progress({ url: base, scanned: scanned.length });
+
 
       const $ = cheerio.load(html);
       const queue = [];
@@ -178,7 +199,9 @@ async function scanVariants(variants, progress = () => {}) {
         }
       });
 
-      await crawlVariant(page, base, visited, scanned, found, queue, progress);
+
+      await crawlVariant(page, base, visited, scanned, found, pageResults, queue);
+
     }
 
     const result = {};
@@ -186,7 +209,12 @@ async function scanVariants(variants, progress = () => {}) {
       result[name] = { ids: Array.from(data.ids), method: data.method };
     }
 
-    const summary = { working_variants: working, scanned_urls: scanned, found_analytics: result };
+    const summary = {
+      working_variants: working,
+      scanned_urls: scanned,
+      found_analytics: result,
+      page_results: pageResults
+    };
     console.log('Scan summary:', summary);
     return summary;
   } finally {

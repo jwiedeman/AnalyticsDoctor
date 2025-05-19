@@ -4,21 +4,31 @@ document.getElementById('scan-form').addEventListener('submit', (event) => {
     event.preventDefault();
     const domain = document.getElementById('domain').value.trim();
     const resultEl = document.getElementById('result');
-    resultEl.textContent = '';
 
-    const es = new EventSource(`${API_BASE_URL}/scan-stream?domain=${encodeURIComponent(domain)}`);
-    es.onmessage = (e) => {
-        const data = JSON.parse(e.data);
-        if (data.done) {
-            es.close();
-            resultEl.textContent += 'Scan complete\n';
-            resultEl.textContent += JSON.stringify(data.result, null, 2);
-        } else {
-            resultEl.textContent += `Scanned: ${data.url}\n`;
+    const pagesEl = document.getElementById('pages');
+    resultEl.textContent = 'Scanning...';
+    pagesEl.innerHTML = '';
+    try {
+        const response = await fetch(`${API_BASE_URL}/scan`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ domain })
+        });
+        const data = await response.json();
+        if (data.page_results) {
+            for (const [url, analytics] of Object.entries(data.page_results)) {
+                const pre = document.createElement('pre');
+                pre.textContent = `${url}\n${JSON.stringify(analytics, null, 2)}`;
+                pagesEl.appendChild(pre);
+            }
         }
-    };
-    es.onerror = () => {
-        resultEl.textContent += 'Error connecting to server.\n';
-        es.close();
-    };
+        resultEl.textContent = JSON.stringify({
+            working_variants: data.working_variants,
+            scanned_urls: data.scanned_urls,
+            found_analytics: data.found_analytics
+        }, null, 2);
+    } catch (err) {
+        resultEl.textContent = 'Error: ' + err.toString();
+    }
+
 });

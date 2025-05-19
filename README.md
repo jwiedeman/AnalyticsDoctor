@@ -23,6 +23,17 @@ The backend uses **Express** with the `cors` middleware so requests from any ori
 
 The Node.js implementation relies on **Puppeteer** to load pages in a real headless browser while scanning up to 500 pages per site.
 
+## API Response
+
+The `/scan` endpoint returns JSON describing the analytics detected. The object
+has these fields:
+
+- `working_variants` – which domain variants responded successfully
+- `scanned_urls` – every page that was crawled
+- `found_analytics` – aggregated analytics IDs and detection methods
+- `page_results` – mapping of each scanned URL to the analytics found on that
+  page
+
 ## Running with Docker
 
 To ensure the backend uses a compatible Node.js version, you can build a Docker image.
@@ -38,12 +49,14 @@ The Dockerfile installs the system `chromium` package and sets
 This avoids architecture issues (for example when building on Apple Silicon)
 and ensures scans run reliably.
 
+
 ## Live progress updates
 
 The backend exposes `/scan-stream` which streams progress updates using
 **Server-Sent Events**. The frontend listens to this endpoint so each scanned
 page is reported in real time. When the scan finishes, the full summary is
 sent and the connection closes.
+
 
 
 ## Exposing with ngrok
