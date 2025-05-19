@@ -3,5 +3,8 @@ WORKDIR /app
 COPY backend-js/package*.json ./
 RUN npm install --production
 COPY backend-js/ ./
-EXPOSE 5000
+
+# Expose the backend port. This should match the PORT env variable used by
+# the server (5005 by default).
+EXPOSE 5005
 CMD ["node", "index.js"]

@@ -29,7 +29,8 @@ To ensure the backend uses a compatible Node.js version, you can build a Docker 
 
 ```
 docker build -t analytics-doctor-backend .
-docker run -p 5000:5000 analytics-doctor-backend
+docker run -p 5005:5005 analytics-doctor-backend
+
 ```
 
 The provided `Dockerfile` uses the official **Node 20** image so Puppeteer runs without socket issues on newer Node releases.
@@ -39,10 +40,10 @@ The provided `Dockerfile` uses the official **Node 20** image so Puppeteer runs 
 You can expose the local backend using **ngrok** so that the frontend can reach the API from the web:
 
 ```
-ngrok http 5000
+ngrok http 5005
 ```
 
-Take the HTTPS URL provided by ngrok and update `frontend/script.js` to use that endpoint instead of `http://localhost:5000`.
+Take the HTTPS URL provided by ngrok and update `frontend/script.js` to use that endpoint instead of `http://localhost:5005`.
 Set the `API_BASE_URL` constant in `frontend/script.js` to the public URL of the backend, for example the HTTPS address provided by ngrok.
 
 
@@ -61,7 +62,7 @@ The frontend is static so it can be hosted on any web server. During development
    ngrok.
 3. Commit and push the change. Every push will trigger a new Vercel deployment
    if you have connected the repository to Vercel.
-4. Start your backend locally and run `ngrok http 5000` each time. Update the
+4. Start your backend locally and run `ngrok http 5005` each time. Update the
    constant whenever the ngrok URL changes and redeploy the frontend.
 
 ## Disclaimer
