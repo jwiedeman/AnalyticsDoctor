@@ -111,3 +111,14 @@ h1 {
     align-items: center;
     gap: 0.25rem;
 }
+
+.analytics-cell .method {
+    font-weight: bold;
+    margin-bottom: 2px;
+    color: #0b3d91;
+}
+
+.analytics-cell .ids {
+    font-size: 0.85em;
+    color: #555;
+}
