@@ -1,12 +1,12 @@
 from flask import Flask, request, jsonify
-
 from flask_cors import CORS
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/scan": {"origins": "*"}}, supports_credentials=True)
+
 
 
 MAX_PAGES = 500
