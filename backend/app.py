@@ -2,8 +2,10 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
+
 import asyncio
 import aiohttp
+
 import re
 
 app = Flask(__name__)
@@ -95,6 +97,7 @@ def find_analytics_in_html(html: str):
     return detected
 
 
+
 async def crawl_variant(
     session: aiohttp.ClientSession,
     base_url: str,
@@ -136,6 +139,7 @@ async def crawl_variant(
                 break
 
 
+
 def merge_analytics_data(found: dict, page_results: dict):
     """Merge analytics detection data from a single page into the accumulator."""
     for name, data in page_results.items():
@@ -151,6 +155,7 @@ async def scan_variants(variants):
     found_analytics = {}
     visited = set()
 
+
     async with aiohttp.ClientSession() as session:
         for base_url in variants:
             if len(scanned_urls) >= MAX_PAGES:
@@ -162,6 +167,46 @@ async def scan_variants(variants):
             scanned_urls.append(base_url)
             visited.add(base_url)
             merge_analytics_data(found_analytics, find_analytics_in_html(html))
+    for base_url in variants:
+        html = fetch_url(base_url)
+        if not html:
+            continue
+        working_variants.append(base_url)
+        visited.add(base_url)
+        scanned_urls.append(base_url)
+
+        page_results = find_analytics_in_html(html)
+        for name, data in page_results.items():
+            entry = found_analytics.setdefault(name, {'ids': set(), 'method': data.get('method')})
+            entry['ids'].update(data.get('ids', []))
+            if not entry.get('method') and data.get('method'):
+                entry['method'] = data['method']
+
+        soup = BeautifulSoup(html, 'html.parser')
+        links = [urljoin(base_url, a['href']) for a in soup.find_all('a', href=True)]
+        queue = []
+        for link in links:
+            if len(queue) + len(visited) >= MAX_PAGES:
+                break
+            if urlparse(link).netloc == urlparse(base_url).netloc:
+                queue.append(link)
+        while queue and len(scanned_urls) < MAX_PAGES:
+            url = queue.pop(0)
+            if url in visited:
+                continue
+            html = fetch_url(url)
+            if not html:
+                continue
+            visited.add(url)
+            scanned_urls.append(url)
+
+            page_results = find_analytics_in_html(html)
+            for name, data in page_results.items():
+                entry = found_analytics.setdefault(name, {'ids': set(), 'method': data.get('method')})
+                entry['ids'].update(data.get('ids', []))
+                if not entry.get('method') and data.get('method'):
+                    entry['method'] = data['method']
+
 
             soup = BeautifulSoup(html, 'html.parser')
             queue = []
@@ -172,6 +217,7 @@ async def scan_variants(variants):
                     and link not in visited
                 ):
                     queue.append(link)
+
 
             await crawl_variant(session, base_url, visited, scanned_urls, found_analytics, queue)
 
@@ -199,6 +245,20 @@ def scan_domain():
 
     result = asyncio.run(scan_variants(variants))
     return jsonify(result)
+
+            if len(scanned_urls) >= MAX_PAGES:
+                break
+        # do not break here so we test all domain variants
+
+    # convert id sets to lists for JSON serialisation
+    for data in found_analytics.values():
+        data['ids'] = list(data['ids'])
+
+    return jsonify({
+        'working_variants': working_variants,
+        'scanned_urls': scanned_urls,
+        'found_analytics': found_analytics
+    })
 
 
 if __name__ == '__main__':
