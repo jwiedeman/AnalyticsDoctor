@@ -6,14 +6,17 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <h1>Analytics Doctor</h1>
-    <form id="scan-form">
-        <label for="domain">Enter domain:</label>
-        <input type="text" id="domain" name="domain" placeholder="example.com">
-        <button type="submit">Scan</button>
-    </form>
-    <div id="pages"></div>
-    <pre id="result"></pre>
+    <div class="container">
+        <h1>Analytics Doctor</h1>
+        <form id="scan-form">
+            <label for="domain">Enter domain:</label>
+            <input type="text" id="domain" name="domain" placeholder="example.com">
+            <button type="submit">Scan</button>
+        </form>
+        <div id="status"></div>
+        <div id="pages"></div>
+        <pre id="result"></pre>
+    </div>
     <script src="script.js"></script>
 </body>
 </html>
