@@ -33,6 +33,7 @@ ngrok http 5000
 Take the HTTPS URL provided by ngrok and update `frontend/script.js` to use that endpoint instead of `http://localhost:5000`.
 Set the `API_BASE_URL` constant in `frontend/script.js` to the public URL of the backend, for example the HTTPS address provided by ngrok.
 
+
 When deploying the frontend (e.g. on Vercel), commit this change so the static
 site points to the correct backend URL. The backend allows requests from any
 origin by default thanks to `flask-cors`, so no additional CORS configuration is
