@@ -45,6 +45,7 @@ button {
     border: 1px solid #ddd;
     padding: 0.5rem;
     text-align: left;
+    word-break: break-word;
 }
 
 #pages-table th {
